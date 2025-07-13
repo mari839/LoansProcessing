@@ -11,8 +11,6 @@ Ext.NET Razor Pages UI for the frontend
 MSSQL (Entity Framework Core) for persistence
 
 1. Clone the Repository
-git clone https://github.com/yourusername/loan-processing.git
-cd loan-processing
 
 2. Run RabbitMQ with Docker
 RabbitMQ is required for messaging between services.
