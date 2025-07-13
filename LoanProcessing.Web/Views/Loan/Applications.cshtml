@@ -1,0 +1,59 @@
+﻿@using Ext.Net
+@{
+    Layout = null;
+    var userId = Session["userId"] != null ? Session["userId"].ToString() : "0";
+}
+
+@(Html.X().ResourceManager())
+@(Html.X().GridPanel()
+    .ID("loanGrid")
+    .Title("My Loan Applications")
+    .Height(400)
+    .Width(700)
+    .Store(Html.X().Store()
+        .ID("loanStore")
+        .Fields("loanType", "amount", "currency", "period", "status")
+    )
+    .ColumnModel(
+        Html.X().Column().Text("Loan Type").DataIndex("loanType").Flex(1),
+        Html.X().Column().Text("Amount").DataIndex("amount").Flex(1),
+        Html.X().Column().Text("Currency").DataIndex("currency").Flex(1),
+        Html.X().Column().Text("Period (months)").DataIndex("period").Flex(1),
+        Html.X().Column()
+            .Text("Status")
+            .DataIndex("status")
+            .Renderer(@"
+                function(value) {
+                    switch(value) {
+                        case 0: return 'Submitted';
+                        case 1: return 'Processing';
+                        case 2: return 'Approved';
+                        case 3: return 'Rejected';
+                        default: return 'Unknown';
+                    }
+                }
+            ")
+            .Flex(1)
+    )
+)
+
+<script>
+    Ext.onReady(function(){
+        Ext.Ajax.request({
+            url: '@Url.Action("GetLoanApplicationsList", "Loan")',
+            method: 'GET',
+            params: { userId: '@userId' },
+            success: function(response) {
+                var data = Ext.decode(response.responseText);
+                if(data && data.apps){
+                    App.loanStore.loadData(data.apps);
+                } else {
+                    Ext.Msg.alert('Info', 'No loan applications found.');
+                }
+            },
+            failure: function() {
+                Ext.Msg.alert('Error', 'Failed to load loan applications.');
+            }
+        });
+    });
+</script>

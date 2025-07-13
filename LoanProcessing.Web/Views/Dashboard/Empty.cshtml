@@ -1,0 +1,114 @@
+﻿@using Ext.Net
+@{
+    Layout = null;
+}
+
+@(Html.X().ResourceManager())
+@(Html.X().Panel()
+    .Title("Welcome to Loan Processing Dashboard")
+    .Width(600)
+    .Padding(20)
+    .Layout(LayoutType.VBox)
+    .Items(
+        Html.X().DisplayField()
+            .Value("You have no loan applications yet.")
+            .MarginSpec("0 0 20 0"),
+        Html.X().Button()
+            .Text("Register Loan Application")
+            .Icon(Icon.Add)
+            .Scale(ButtonScale.Large)
+            .Handler(@"
+                Ext.create('Ext.window.Window', {
+                    title: 'New Loan Application',
+                    modal: true,
+                    width: 400,
+                    layout: 'fit',
+                    items: {
+                        xtype: 'form',
+                        bodyPadding: 10,
+                        items: [
+                            {
+                                xtype: 'combo',
+                                name: 'loanType',
+                                fieldLabel: 'Loan Type',
+                                store: [['0', 'Quick Loan'], ['1', 'Auto Loan'], ['2', 'Installment']],
+                                forceSelection: true,
+                                allowBlank: false
+                            },
+                            {
+                                xtype: 'numberfield',
+                                name: 'amount',
+                                fieldLabel: 'Amount',
+                                minValue: 1,
+                                allowBlank: false
+                            },
+                                {
+                                xtype: 'textfield',
+                                name: 'currency',
+                                fieldLabel: 'Currency',
+                                allowBlank: false,
+                                listeners: {
+                                    render: function(field) {
+                                        field.setValue('GEL');
+                                    }
+                                }
+                            },
+                            {
+                                xtype: 'numberfield',
+                                name: 'period',
+                                fieldLabel: 'Period (Months)',
+                                minValue: 1,
+                                allowBlank: false
+                            }
+                        ],
+                        buttons: [
+                            {
+                                text: 'Submit',
+                                handler: function () {
+                                var win = this.up('window');
+                                var form = win.down('form').getForm();
+                                if (form.isValid()) {
+                                    var values = form.getValues(false, true);
+
+                                    // Debug to confirm all fields are present
+                                    console.log(values);
+
+                                    values.loanType = parseInt(values.loanType);
+                                    values.amount = parseFloat(values.amount);
+                                    values.period = parseInt(values.period);
+                                    values.userId = parseInt(localStorage.getItem('userId'));
+
+                                    delete values._loanType_state;
+
+                                    Ext.Ajax.request({
+                                        url: 'https://localhost:7115/api/LoanApplication/CreateLoanApplication',
+                                        method: 'POST',
+                                        headers: {
+                                            Authorization: 'Bearer ' + localStorage.getItem('token')
+                                        },
+                                        jsonData: values,
+                                        success: function () {
+                                            Ext.Msg.alert('Success', 'Loan registered!');
+                                            win.close();
+                                            window.location.href = '/Dashboard/Index';
+                                        },
+                                        failure: function (response) {
+                                            Ext.Msg.alert('Error', 'Registration failed. ' + response.statusText);
+                                        }
+                                    });
+                                }
+                            }
+
+                            },
+                            {
+                                text: 'Cancel',
+                                handler: function() {
+                                    this.up('window').close();
+                                }
+                            }
+                        ]
+                    }
+                }).show();
+            ")
+    )
+)

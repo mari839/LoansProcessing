@@ -1,0 +1,256 @@
+﻿@using Ext.Net
+@{
+    Layout = null;
+
+    var role = Context.Request.Cookies["userRole"]?.Value ?? "User"; // default role User
+    var userId = Context.Request.Cookies["userId"]?.Value ?? "";
+
+    var columns = new List<Ext.Net.ColumnBase>
+{
+        Html.X().Column().Text("Loan Type").DataIndex("loanType").Flex(1)
+            .Renderer(@"function(value) {
+                switch(value) {
+                    case 0: return 'Quick Loan';
+                    case 1: return 'Auto Loan';
+                    case 2: return 'Installment';
+                    default: return 'Unknown';
+                }
+            }"),
+            Html.X().Column().Text("Amount").DataIndex("amount").Flex(1),
+            Html.X().Column().Text("Currency").DataIndex("currency").Flex(1),
+            Html.X().Column().Text("Period (Months)").DataIndex("period").Flex(1),
+            Html.X().Column().Text("Status").DataIndex("status").Flex(1)
+            .Renderer(@"function(value) {
+                switch(value) {
+                    case 0: return 'In Process';
+                    case 1: return 'Submitted';
+                    case 2: return 'Approved';
+                    case 3: return 'Rejected';
+                    default: return 'Unknown';
+                }
+            }")
+    };
+
+    if (role == "User")
+    {
+        var userActions = new List<Ext.Net.ActionItem>
+    {
+        Html.X().ActionItem()
+            .Icon(Icon.Pencil)
+            .Tooltip("რედაქტირება")
+            .Handler("function(grid, rowIndex) { var record = grid.getStore().getAt(rowIndex); editLoan(record); }"),
+        Html.X().ActionItem()
+            .Icon(Icon.EmailGo)
+            .Tooltip("გაგზავნა")
+            .Handler("function(grid, rowIndex) { var record = grid.getStore().getAt(rowIndex); submitLoan(record); }")
+    };
+
+        columns.Add(Html.X().ActionColumn().Width(100).Items(userActions));
+    }
+    else if (role == "Approver")
+    {
+        var approverActions = new List<Ext.Net.ActionItem>
+    {
+        Html.X().ActionItem()
+            .Icon(Icon.Accept)
+            .Tooltip("დადასტურება")
+            .Handler("function(grid, rowIndex) { var record = grid.getStore().getAt(rowIndex); approveLoan(record); }"),
+        Html.X().ActionItem()
+            .Icon(Icon.Delete)
+            .Tooltip("უარყოფა")
+            .Handler("function(grid, rowIndex) { var record = grid.getStore().getAt(rowIndex); rejectLoan(record); }"),
+    };
+
+        columns.Add(Html.X().ActionColumn().Width(100).Items(approverActions));
+    }
+}
+
+@(Html.X().ResourceManager())
+@(Html.X().Store()
+    .ID("loanStore")
+    .Model(Html.X().Model()
+        .Fields(
+            new ModelField("id", ModelFieldType.Int),
+            new ModelField("loanType", ModelFieldType.Int),
+            new ModelField("amount", ModelFieldType.Float),
+            new ModelField("currency", ModelFieldType.String),
+            new ModelField("period", ModelFieldType.Int),
+            new ModelField("status", ModelFieldType.Int)
+        )
+    )
+)
+@(Html.X().Viewport()
+    .Layout(LayoutType.VBox)
+    .Items(
+    Html.X().Panel()
+            .Layout(LayoutType.HBox)
+            .Width(700)
+            .Padding(10)
+            .Border(false)
+            .Items(
+                Html.X().DisplayField()
+                    .Flex(1)
+                    .Html($"<div style='font-size:16px;'>Welcome</div>"),
+                Html.X().Button()
+                    .Text("Logout")
+                    .Icon(Icon.DoorOut)
+                    .Handler("logout();")
+            ),
+        // Admin Dashboard Panel (only shown if role is Admin)
+        Html.X().Panel()
+            .Title("Admin Dashboard")
+            .Width(600)
+            .Padding(10)
+            .Hidden(role != "Admin")
+            .Buttons(
+                Html.X().Button()
+                    .Text("Register Approver")
+                    .Icon(Icon.UserAdd)
+                    .Handler("App.approverRegisterWindow.show();")
+            ),
+
+        // Loan Grid
+        Html.X().GridPanel()
+            .ID("loanGrid")
+            .Title("My Loan Applications")
+            .StoreID("loanStore")
+            .Width(700)
+            .Height(400)
+            .Hidden(true)
+            .MarginSpec("0 0 10 0")
+            .ColumnModel(columns),
+
+        // Register Loan Button (only for User)
+        Html.X().Button()
+            .Text("ახალი განაცხადი")
+            .Icon(Icon.Add)
+            .Width(200)
+            .MarginSpec("10 0 0 10")
+            .Hidden(role != "User")
+            .Handler("showLoanForm();")
+    )
+)
+
+@if (role == "Admin")
+{
+    @(Html.X().Window()
+        .ID("approverRegisterWindow")
+        .Title("Register Approver")
+        .Width(500)
+        .Height(400)
+        .Modal(true)
+        .Closable(true)
+        .Hidden(true)
+        .Layout(LayoutType.Fit)
+        .Items(
+            Html.X().FormPanel()
+                .ID("approverForm")
+                .BodyPadding(10)
+                .Defaults(new { Anchor = "100%", LabelAlign = "Top" })
+                .Items(
+                    Html.X().TextField().Name("username").FieldLabel("Username").AllowBlank(false),
+                    Html.X().TextField().Name("password").FieldLabel("Password").InputType(Ext.Net.InputType.Password).AllowBlank(false),
+                    Html.X().TextField().Name("firstName").FieldLabel("First Name").AllowBlank(false),
+                    Html.X().TextField().Name("lastName").FieldLabel("Last Name").AllowBlank(false),
+                    Html.X().TextField().Name("personalId").FieldLabel("Personal ID").AllowBlank(false),
+                    Html.X().DateField().Name("birthDate").FieldLabel("Birth Date").Format("Y-m-d").AllowBlank(false)
+                )
+                .Buttons(
+                    Html.X().Button()
+                        .Text("Register")
+                        .Icon(Icon.Disk)
+                        .FormBind(true)
+                        .Handler(@"
+                            var form = App.approverForm.getForm();
+                            if (form.isValid()) {
+                                var values = form.getValues();
+                                values.birthDate = new Date(values.birthDate).toISOString();
+
+                                Ext.Ajax.request({
+                                    url: 'https://localhost:7115/api/Authentication/RegisterApprover',
+                                    method: 'POST',
+                                    jsonData: values,
+                                    headers: {
+                                        Authorization: 'Bearer ' + localStorage.getItem('token')
+                                    },
+                                    success: function () {
+                                        Ext.Msg.alert('Success', 'Approver registered successfully.');
+                                        App.approverRegisterWindow.hide();
+                                        form.reset();
+                                    },
+                                    failure: function (response) {
+                                        var error = Ext.decode(response.responseText, true);
+                                        var msg = error?.title || response.statusText || 'Registration failed.';
+                                        Ext.Msg.alert('Error', msg);
+                                    }
+                                });
+                            }
+                        "),
+                    Html.X().Button()
+                        .Text("Cancel")
+                        .Icon(Icon.Decline)
+                        .Handler("App.approverRegisterWindow.hide();")
+                )
+         )
+    )
+}
+
+@if (role == "User")
+{
+    @(Html.X().Window()
+        .ID("loanFormWindow")
+        .Title("სესხის განაცხადის ფორმა")
+        .Width(400)
+        .Height(350)
+        .Modal(true)
+        .CloseAction(CloseAction.Hide)
+        .Hidden(true)
+        .Layout(LayoutType.Fit)
+        .Items(
+            Html.X().FormPanel()
+                .ID("loanForm")
+                .BodyPadding(10)
+                .Items(
+                Html.X().Hidden().Name("id"),
+                    Html.X().ComboBox()
+                        .FieldLabel("სესხის ტიპი")
+                        .Name("loanType")
+                        .Items(
+                            new ListItem("სწრაფი სესხი", "0"),
+                            new ListItem("ავტო სესხი", "1"),
+                            new ListItem("განვადება", "2")
+                        )
+                        .Editable(false)
+                        .ForceSelection(true)
+                        .Value("0"),
+                    Html.X().NumberField()
+                        .FieldLabel("თანხა")
+                        .Name("amount")
+                        .AllowBlank(false),
+                    Html.X().ComboBox()
+                        .FieldLabel("ვალუტა")
+                        .Name("currency")
+                        .Items(
+                            new ListItem("GEL", "GEL"),
+                            new ListItem("USD", "USD"),
+                            new ListItem("EUR", "EUR")
+                        )
+                        .Editable(false)
+                        .ForceSelection(true)
+                        .Value("GEL"),
+                    Html.X().NumberField()
+                        .FieldLabel("პერიოდი (თვე)")
+                        .Name("period")
+                        .AllowBlank(false)
+                )
+                .Buttons(
+                    Html.X().Button().Text("შენახვა").Handler("saveLoan();"),
+                    Html.X().Button().Text("დახურვა").Handler("App.loanFormWindow.hide();")
+                )
+        )
+    )
+}
+
+
+ 
+<script src="~/Scripts/ClientResources/dashboard.js"></script>

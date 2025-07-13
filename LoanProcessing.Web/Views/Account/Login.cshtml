@@ -1,0 +1,129 @@
+﻿
+
+
+
+@using Ext.Net
+@{
+    Layout = null;
+}
+
+@(Html.X().ResourceManager())
+@(Html.X().Window()
+    .ID("authWindow")
+    .Title("Loan Processing Authentication")
+    .Width(480)
+    .Height(600)
+    .Modal(true)
+    .Closable(false)
+    .Resizable(true)
+    .Layout("Fit")
+    .Items(
+        Html.X().TabPanel()
+            .ID("authTabs")
+            .ActiveTabIndex(0)
+            .Defaults(new { BodyPadding = 20 })
+            .Items(
+                // === LOGIN FORM ===
+                Html.X().FormPanel()
+                    .ID("loginForm")
+                    .Title("Login")
+                    .BodyPadding(20)
+                    .Defaults(new { Anchor = "100%", labelAlign = "top" })
+                    .Items(
+                        Html.X().TextField()
+                            .Name("username")
+                            .FieldLabel("Username")
+                            .EmptyText("Enter your username")
+                            .AllowBlank(false),
+                        Html.X().TextField()
+                            .Name("password")
+                            .FieldLabel("Password")
+                            .InputType(Ext.Net.InputType.Password)
+                            .EmptyText("Enter your password")
+                            .AllowBlank(false)
+                    )
+                    .Buttons(
+                        Html.X().Button()
+                            .Text("Login")
+                            .FormBind(true)
+                            .Icon(Icon.Key)
+                            .Scale(ButtonScale.Medium)
+                            .Handler(@"
+                                var form = this.up('form').getForm();
+                                if (form.isValid()) {
+                                    var values = form.getValues();
+                                    Ext.Ajax.request({
+                                        url: 'https://localhost:7115/api/Authentication/Login',
+                                        method: 'POST',
+                                        jsonData: values,
+                                        success: function (response) {
+                                            var data = Ext.decode(response.responseText);
+                                            setTokenAndRedirect(data);
+                                        },
+                                        failure: function () {
+                                            Ext.Msg.alert('Error', 'Login failed. Please check your credentials.');
+                                        }
+                                    });
+                                }
+                            "),
+                        Html.X().Button()
+                            .Text("Don't have an account? Register")
+                            .Icon(Icon.UserAdd)
+                            .Handler("App.authTabs.setActiveTab(1);")
+                    ),
+
+                // === REGISTER FORM ===
+                Html.X().FormPanel()
+                    .ID("registerForm")
+                    .Title("Register")
+                    .Scrollable(ScrollableOption.Vertical)
+                    .BodyPadding(20)
+                    .Defaults(new { Anchor = "100%", labelAlign = "top" })
+                    .Items(
+                        Html.X().TextField().Name("username").FieldLabel("Username").AllowBlank(false),
+                        Html.X().TextField().Name("password").FieldLabel("Password").InputType(Ext.Net.InputType.Password).AllowBlank(false),
+                        Html.X().TextField().Name("firstName").FieldLabel("First Name").AllowBlank(false),
+                        Html.X().TextField().Name("lastName").FieldLabel("Last Name").AllowBlank(false),
+                        Html.X().TextField().Name("personalId").FieldLabel("Personal ID").AllowBlank(false),
+                        Html.X().DateField().Name("birthDate").FieldLabel("Birth Date").Format("Y-m-d").AllowBlank(false)
+                    )
+                    .Buttons(
+                        Html.X().Button()
+                            .Text("Register")
+                            .FormBind(true)
+                            .Icon(Icon.Disk)
+                            .Handler(@"
+                                    var form = this.up('form').getForm();
+                                    if (form.isValid()) {
+                                        var values = form.getValues();
+                                        if (values.birthDate) {
+                                            values.birthDate = new Date(values.birthDate).toISOString();
+                                        }
+
+                                        Ext.Ajax.request({
+                                            url: 'https://localhost:7115/api/Authentication/RegisterUser',
+                                            method: 'POST',
+                                            jsonData: values,
+                                            success: function (response) {
+                                                var data = Ext.decode(response.responseText);
+                                                Ext.Msg.alert('Success', 'Registration successful!');
+                                                setTokenAndRedirect(data);
+                                                App.authTabs.setActiveTab(0);
+                                            },
+
+                                            failure: function () {
+                                                Ext.Msg.alert('Error', 'Registration failed. Please try again.');
+                                            }
+                                        });
+                                    }
+                                "),
+                        Html.X().Button()
+                            .Text("Back to Login")
+                            .Icon(Icon.ArrowLeft)
+                            .Handler("App.authTabs.setActiveTab(0);")
+                    )
+            )
+    )
+)
+
+<script src="~/Scripts/ClientResources/auth.js"></script>
